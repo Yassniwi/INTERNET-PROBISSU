@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NetHelp - Internet Issue Chatbot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      background: #eef3f9;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .chat-container {
+      width: 100%;
+      max-width: 520px;
+      height: 92vh;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      background: #1e6fd9;
+      color: #ffffff;
+      padding: 16px 20px;
+    }
+    .chat-header h1 { font-size: 18px; }
+    .chat-header p { font-size: 13px; opacity: 0.85; margin-top: 2px; }
+
+    .chat-box {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #f7f9fc;
+    }
+
+    .message {
+      max-width: 82%;
+      padding: 10px 14px;
+      border-radius: 14px;
+      font-size: 14.5px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+    .message.user {
+      align-self: flex-end;
+      background: #1e6fd9;
+      color: #ffffff;
+      border-bottom-right-radius: 4px;
+    }
+    .message.bot {
+      align-self: flex-start;
+      background: #ffffff;
+      color: #222222;
+      border: 1px solid #e1e7ef;
+      border-bottom-left-radius: 4px;
+    }
+    .message.typing { color: #888888; font-style: italic; }
+
+    .input-area {
+      display: flex;
+      gap: 8px;
+      padding: 12px;
+      border-top: 1px solid #e1e7ef;
+      background: #ffffff;
+    }
+    .input-area input {
+      flex: 1;
+      padding: 12px 14px;
+      border: 1px solid #ccd5e0;
+      border-radius: 24px;
+      font-size: 14.5px;
+      outline: none;
+    }
+    .input-area input:focus { border-color: #1e6fd9; }
+    .input-area button {
+      padding: 0 20px;
+      border: none;
+      border-radius: 24px;
+      background: #1e6fd9;
+      color: #ffffff;
+      font-size: 14.5px;
+      cursor: pointer;
+    }
+    .input-area button:disabled { background: #9db9e0; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h1>NetHelp</h1>
+      <p>Your Internet Issue Assistant</p>
+    </div>
+
+    <div class="chat-box" id="chatBox"></div>
+
+    <div class="input-area">
+      <input type="text" id="userInput" placeholder="Describe your internet problem..." maxlength="1000" autocomplete="off">
+      <button id="sendBtn">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const chatBox = document.getElementById("chatBox");
+    const userInput = document.getElementById("userInput");
+    const sendBtn = document.getElementById("sendBtn");
+    const history = [];
+
+    function addMessage(text, sender) {
+      const div = document.createElement("div");
+      div.className = "message " + sender;
+      div.textContent = text;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      return div;
+    }
+
+    async function sendMessage() {
+      const message = userInput.value.trim();
+      if (!message) return;
+
+      addMessage(message, "user");
+      userInput.value = "";
+      sendBtn.disabled = true;
+
+      const typing = addMessage("Typing...", "bot typing");
+
+      try {
+        const response = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message, history })
+        });
+        const data = await response.json();
+        typing.remove();
+
+        if (data.reply) {
+          addMessage(data.reply, "bot");
+          history.push({ role: "user", text: message });
+          history.push({ role: "bot", text: data.reply });
+        } else {
+          addMessage(data.error || "Something went wrong.", "bot");
+        }
+      } catch (error) {
+        typing.remove();
+        addMessage("Network error. Please try again.", "bot");
+      } finally {
+        sendBtn.disabled = false;
+        userInput.focus();
+      }
+    }
+
+    sendBtn.addEventListener("click", sendMessage);
+    userInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendMessage();
+    });
+
+    addMessage({{ welcome|tojson }}, "bot");
+  </script>
+</body>
+</html>
